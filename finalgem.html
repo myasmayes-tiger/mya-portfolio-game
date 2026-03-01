@@ -1,0 +1,398 @@
+HTML
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Creative Strategy Journey | Final Portfolio Edition</title>
+    <style>
+        :root {
+            --bg-color: #fdf6f0; 
+            --accent-color: #5d4037; 
+            --ui-panel: rgba(255, 255, 255, 0.95);
+            --text-main: #2c2c2c;
+            --font-fancy: 'Georgia', serif;
+            --link-color: #0077b5; /* LinkedIn Blue */
+        }
+
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: #1a1a1a; overflow: hidden; 
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: var(--bg-color);
+            border: 8px solid #333;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        canvas { display: block; background: #fff; }
+
+        #hud {
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between;
+            pointer-events: none; z-index: 10;
+        }
+        .stat-box {
+            background: var(--ui-panel); padding: 5px 15px;
+            border-radius: 20px; border: 2px solid var(--accent-color);
+            font-family: var(--font-fancy); font-size: 12px; font-weight: bold;
+        }
+
+        #dialogue-container {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            width: 90%; height: 140px;
+            background: var(--ui-panel);
+            border: 3px solid var(--accent-color);
+            border-radius: 10px;
+            padding: 20px; display: none;
+            z-index: 100; font-family: var(--font-fancy);
+        }
+        #speaker-name { font-weight: bold; color: var(--accent-color); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        #text-content { font-size: 16px; line-height: 1.4; color: var(--text-main); cursor: pointer; }
+        #choices-container { margin-top: 10px; display: flex; gap: 10px; }
+        
+        .choice-btn {
+            padding: 8px 18px; border: 1px solid var(--accent-color);
+            background: white; cursor: pointer; font-family: inherit;
+            transition: 0.2s; font-weight: bold;
+        }
+        .choice-btn:hover { background: var(--accent-color); color: white; }
+
+        .overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; color: white; text-align: center; z-index: 1000;
+            font-family: var(--font-fancy);
+        }
+        .btn-start {
+            padding: 15px 40px; background: var(--bg-color); color: #000;
+            border: none; cursor: pointer; font-size: 18px; margin-top: 20px;
+            letter-spacing: 2px;
+            text-decoration: none; display: inline-block;
+        }
+
+        #interact-hint {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            color: var(--accent-color); font-weight: bold; pointer-events: none;
+            display: none; font-family: sans-serif; text-shadow: 0 0 5px white;
+            z-index: 50;
+        }
+
+        #linkedin-link {
+            color: var(--link-color);
+            font-weight: bold;
+            text-decoration: underline;
+            margin-top: 15px;
+            display: block;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="hud">
+        <div class="stat-box">CREATIVITY: <span id="stat-creativity">20</span></div>
+        <div class="stat-box">STRATEGY: <span id="stat-strategy">20</span></div>
+        <div class="stat-box">CONFIDENCE: <span id="stat-confidence">20</span></div>
+    </div>
+
+    <div id="interact-hint">[CLICK TO INTERACT]</div>
+
+    <div id="dialogue-container">
+        <div id="speaker-name">ME</div>
+        <div id="text-content">...</div>
+        <div id="choices-container"></div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1 style="font-size: 40px;">THE LAYERED LENS</h1>
+        <p>A Portfolio Adventure</p>
+        <button class="btn-start" onclick="startGame()">ENTER MY MIND</button>
+    </div>
+
+    <div id="end-screen" class="overlay" style="display:none;">
+        <h1>THE FINAL FRAME</h1>
+        <div id="summary-card" style="background: white; color: black; padding: 30px; border-radius: 10px; margin: 20px; width: 80%;">
+            <h2 id="end-title">Creative Strategist</h2>
+            <p id="end-desc"></p>
+            <div id="final-stats"></div>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+            <p style="margin-bottom: 5px; font-weight: bold;">Connect:</p>
+            <a id="linkedin-link" href="https://www.linkedin.com/in/mya-mayes/" target="_blank">linkedin.com/in/mya-mayes/</a>
+        </div>
+        <button class="btn-start" onclick="location.reload()">REPLAY JOURNEY</button>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+</div>
+
+<script>
+/** PERSONALIZATION CONSTANTS **/
+const TAGLINE = "romanticize the process";
+const SKIN_TONE = "#5d4037"; 
+const HAIR_COLOR = "#1a1a1a";
+const OUTFIT_COLOR = "#d7ccc8"; 
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let gameActive = false;
+let currentScene = "bedroom";
+let dialogueActive = false;
+
+let stats = { creativity: 20, strategy: 20, confidence: 20 };
+
+const player = {
+    x: 400, y: 300, w: 40, h: 60,
+    speed: 5, vx: 0, vy: 0
+};
+
+const keys = {};
+
+const scenes = {
+    bedroom: {
+        bg: "#fdf6f0", floor: "#eaddd5",
+        objects: [
+            { id: "laptop", x: 100, y: 150, w: 80, h: 50, color: "#333", label: "Laptop", dialog: ["My digital window to the world.", "I've been iterating on my portfolio all week.", "Should I prioritize 'Aesthetics' or 'Conversion Data'?"], choices: [{t: "Aesthetics", s: "creativity"}, {t: "Data", s: "strategy"}] },
+            { id: "board", x: 350, y: 50, w: 120, h: 80, color: "#d1c4e9", label: "Vision Board", dialog: ["Mass Comm major, digital ad brain, city girl heart.", "Every pin here is a campaign waiting to happen."] },
+            { id: "rack", x: 650, y: 100, w: 100, h: 150, color: "#8d6e63", label: "Outfit Rack", dialog: ["Curating an image is a form of branding.", "Neutral tones and soft luxury—that's the vibe."] }
+        ],
+        exits: [{ x: 750, y: 250, w: 50, h: 100, target: "studio", label: "To Studio →" }],
+        obstacles: [{ x: 0, y: 0, w: 800, h: 100 }]
+    },
+    studio: {
+        bg: "#fafafa", floor: "#f5f5f5",
+        objects: [
+            { id: "camera", x: 150, y: 200, w: 40, h: 60, color: "#111", label: "Camera", dialog: ["Document, don't create.", "It's about capturing the authenticity of the process."] },
+            { id: "table", x: 400, y: 400, w: 200, h: 100, color: "#795548", label: "Moodboard Table", dialog: ["Physical textures meet digital strategy.", "Which direction for the new campaign?", "Bold and Loud or Soft and Intimate?"], choices: [{t: "Bold", s: "confidence"}, {t: "Soft", s: "creativity"}] }
+        ],
+        exits: [
+            { x: 0, y: 250, w: 50, h: 100, target: "bedroom", label: "← Bedroom" },
+            { x: 750, y: 250, w: 50, h: 100, target: "warroom", label: "To War Room →" }
+        ],
+        obstacles: []
+    },
+    warroom: {
+        bg: "#e3f2fd", floor: "#cfd8dc",
+        objects: [
+            { id: "whiteboard", x: 300, y: 50, w: 250, h: 120, color: "#fff", label: "Whiteboard", dialog: ["The Big Idea: 'Intentional Living through Digital Access'.", "Use Social Proof or ROI Projections?"], choices: [{t: "Social Proof", s: "creativity"}, {t: "ROI", s: "strategy"}] },
+            { id: "analytics", x: 100, y: 400, w: 100, h: 80, color: "#263238", label: "Dashboard", dialog: ["Numbers don't lie, but they do tell a story.", "The CTR is up. My strategy is working."] }
+        ],
+        exits: [
+            { x: 0, y: 250, w: 50, h: 100, target: "studio", label: "← Studio" },
+            { x: 750, y: 250, w: 50, h: 100, target: "music", label: "To Music Room →" }
+        ],
+        obstacles: []
+    },
+    music: {
+        bg: "#fce4ec", floor: "#f8bbd0",
+        objects: [
+            { id: "guitar", x: 400, y: 150, w: 40, h: 100, color: "#e67e22", label: "Guitar", dialog: ["Still learning chords.", "Music is the rhythm behind my creative flow."] },
+            { id: "speaker", x: 100, y: 100, w: 60, h: 60, color: "#333", label: "Speaker", dialog: ["Current playlist: Lofi City Girl Vibes.", "Keeps me disciplined during late-night builds."] }
+        ],
+        exits: [
+            { x: 0, y: 250, w: 50, h: 100, target: "warroom", label: "← War Room" },
+            { x: 375, y: 550, w: 50, h: 50, target: "city", label: "↓ City Map" }
+        ],
+        obstacles: []
+    },
+    city: {
+        bg: "#eee", floor: "#ddd",
+        objects: [
+            { id: "map", x: 200, y: 100, w: 400, h: 300, color: "#fff", label: "City Map", dialog: ["New York or London?"], choices: [{t: "New York", s: "strategy"}, {t: "London", s: "confidence"}] }
+        ],
+        exits: [
+            { x: 375, y: 0, w: 50, h: 50, target: "music", label: "↑ Music Room" },
+            { x: 750, y: 250, w: 50, h: 100, target: "interview", label: "The Interview →" }
+        ],
+        obstacles: []
+    },
+    interview: {
+        bg: "#fff", floor: "#f5f5f5",
+        objects: [
+            { id: "recruiter", x: 400, y: 100, w: 80, h: 120, color: "#2c3e50", label: "Recruiter", dialog: ["Recruiter: 'Mya, tell me, why should we choose your strategy?'"], choices: [{t: "My Creative Vision", s: "creativity"}, {t: "My Market Results", s: "strategy"}] }
+        ],
+        exits: [],
+        obstacles: []
+    }
+};
+
+function startGame() {
+    document.getElementById('start-screen').style.display = 'none';
+    gameActive = true;
+    requestAnimationFrame(update);
+}
+
+window.addEventListener('keydown', e => { keys[e.code] = true; });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+canvas.addEventListener('mousedown', (e) => {
+    if (dialogueActive) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    scenes[currentScene].objects.forEach(obj => {
+        if (mx > obj.x && mx < obj.x + obj.w && my > obj.y && my < obj.y + obj.h) {
+            const dx = (obj.x + obj.w/2) - (player.x + player.w/2);
+            const dy = (obj.y + obj.h/2) - (player.y + player.h/2);
+            if (Math.sqrt(dx*dx + dy*dy) < 150) showDialogue(obj);
+        }
+    });
+});
+
+function showDialogue(obj) {
+    dialogueActive = true;
+    const box = document.getElementById('dialogue-container');
+    const textEl = document.getElementById('text-content');
+    const speaker = document.getElementById('speaker-name');
+    const choicesEl = document.getElementById('choices-container');
+    
+    box.style.display = 'block';
+    speaker.innerText = obj.label === "Recruiter" ? "RECRUITER" : "ME";
+    choicesEl.innerHTML = '';
+    
+    let lineIndex = 0;
+    textEl.innerText = obj.dialog[lineIndex];
+
+    const nextStep = () => {
+        lineIndex++;
+        if (lineIndex < obj.dialog.length) {
+            textEl.innerText = obj.dialog[lineIndex];
+        } else {
+            textEl.onclick = null;
+            if (obj.choices) {
+                obj.choices.forEach(c => {
+                    const btn = document.createElement('button');
+                    btn.className = 'choice-btn';
+                    btn.innerText = c.t;
+                    btn.onclick = () => {
+                        stats[c.s] += 15;
+                        stats.confidence += 5;
+                        updateStats();
+                        closeDialogue();
+                        if (obj.id === "recruiter") endStory();
+                    };
+                    choicesEl.appendChild(btn);
+                });
+            } else {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerText = "Close";
+                btn.onclick = closeDialogue;
+                choicesEl.appendChild(btn);
+            }
+        }
+    };
+
+    textEl.onclick = nextStep;
+}
+
+function closeDialogue() {
+    dialogueActive = false;
+    document.getElementById('dialogue-container').style.display = 'none';
+    document.getElementById('choices-container').innerHTML = '';
+}
+
+function updateStats() {
+    document.getElementById('stat-creativity').innerText = stats.creativity;
+    document.getElementById('stat-strategy').innerText = stats.strategy;
+    document.getElementById('stat-confidence').innerText = stats.confidence;
+}
+
+function update() {
+    if (!gameActive) return;
+
+    if (!dialogueActive) {
+        player.vx = 0; player.vy = 0;
+        if (keys['KeyW'] || keys['ArrowUp']) player.vy = -player.speed;
+        if (keys['KeyS'] || keys['ArrowDown']) player.vy = player.speed;
+        if (keys['KeyA'] || keys['ArrowLeft']) player.vx = -player.speed;
+        if (keys['KeyD'] || keys['ArrowRight']) player.vx = player.speed;
+
+        const nextX = player.x + player.vx;
+        const nextY = player.y + player.vy;
+
+        let blocked = false;
+        scenes[currentScene].obstacles.forEach(o => {
+            if (nextX < o.x + o.w && nextX + player.w > o.x && nextY < o.y + o.h && nextY + player.h > o.y) blocked = true;
+        });
+
+        if (!blocked) {
+            player.x = Math.max(0, Math.min(800 - player.w, nextX));
+            player.y = Math.max(0, Math.min(600 - player.h, nextY));
+        }
+
+        scenes[currentScene].exits.forEach(ex => {
+            if (player.x < ex.x + ex.w && player.x + player.w > ex.x && player.y < ex.y + ex.h && player.y + player.h > ex.y) {
+                currentScene = ex.target;
+                player.x = 400; player.y = 300;
+            }
+        });
+
+        let nearObj = false;
+        scenes[currentScene].objects.forEach(obj => {
+            const dx = (obj.x + obj.w/2) - (player.x + player.w/2);
+            const dy = (obj.y + obj.h/2) - (player.y + player.h/2);
+            if (Math.sqrt(dx*dx + dy*dy) < 100) nearObj = true;
+        });
+        document.getElementById('interact-hint').style.display = nearObj ? 'block' : 'none';
+    }
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function draw() {
+    const scene = scenes[currentScene];
+    ctx.fillStyle = scene.bg; ctx.fillRect(0,0,800,600);
+    ctx.fillStyle = scene.floor; ctx.fillRect(0, 400, 800, 200);
+
+    scene.exits.forEach(ex => {
+        ctx.fillStyle = "rgba(0,0,0,0.1)"; ctx.fillRect(ex.x, ex.y, ex.w, ex.h);
+        ctx.fillStyle = "#333"; ctx.font = "12px Georgia"; ctx.fillText(ex.label, ex.x, ex.y - 5);
+    });
+
+    scene.objects.forEach(obj => {
+        ctx.fillStyle = obj.color; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.font = "bold 14px Georgia"; ctx.fillText(obj.label, obj.x, obj.y - 10);
+    });
+
+    drawPlayer(player.x, player.y);
+}
+
+function drawPlayer(x, y) {
+    const floatY = Math.sin(Date.now() / 200) * 3;
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    ctx.beginPath(); ctx.ellipse(x + 20, y + 60, 15, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = OUTFIT_COLOR; ctx.fillRect(x + 5, y + 20 + floatY, 30, 35);
+    ctx.fillStyle = SKIN_TONE; ctx.fillRect(x + 10, y + floatY, 20, 22);
+    ctx.fillStyle = HAIR_COLOR;
+    ctx.beginPath(); ctx.arc(x + 8, y + 5 + floatY, 10, 0, Math.PI * 2); ctx.arc(x + 32, y + 5 + floatY, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "white"; ctx.fillRect(x + 13, y + 8 + floatY, 4, 4); ctx.fillRect(x + 23, y + 8 + floatY, 4, 4);
+}
+
+function endStory() {
+    gameActive = false;
+    document.getElementById('end-screen').style.display = 'flex';
+    let title = stats.strategy > stats.creativity ? "Strategic Campaigner" : "The Intuitive Creative";
+    document.getElementById('end-title').innerText = title;
+    document.getElementById('end-desc').innerText = `Mya's profile: A masterful blend of authenticity and data-driven branding. ${TAGLINE}.`;
+    document.getElementById('final-stats').innerHTML = `
+        <p>Creativity Score: ${stats.creativity} | Strategy Score: ${stats.strategy}</p>
+    `;
+}
+</script>
+</body>
+</html>
